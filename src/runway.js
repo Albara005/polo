@@ -141,6 +141,12 @@
         return `${hit.item.name} · Size ${hit.variant.o.join(' / ')} · Quantity ${e.quantity}\n${hit.item.url}`;
       }).filter(Boolean);
       const text = [BRAND.shortlistHeading, 'Reference prices; no order or payment has been placed.', '', ...lines].join('\n\n');
+      if (BRAND.exportMode === 'copy') {
+        try {
+          navigator.clipboard.writeText(text).then(() => toast('Shortlist copied'), () => toast('Copying isn’t available here'));
+        } catch (_) { toast('Copying isn’t available here'); }
+        return;
+      }
       const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
       const a = document.createElement('a');
       a.href = url; a.download = 'runway-outfit-shortlist.txt';

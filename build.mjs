@@ -4,6 +4,12 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { ASSET, SHOP, BRAND, SECTION_ID, PRODUCTS, CATALOG_ORDER, LOOKS, BUNDLE } from './src/data.mjs';
 
 const here = (p) => new URL(p, import.meta.url);
+// `node build.mjs` -> index.html (images from the Vercel asset host)
+// `node build.mjs --artifact --out=<file>` -> body-only page for claude.ai
+// Artifacts, with images published beside it under assets/
+const ARTIFACT = process.argv.includes('--artifact');
+const OUT = (process.argv.find((a) => a.startsWith('--out=')) || '').slice(6);
+const BASE = ARTIFACT ? 'assets/' : ASSET;
 const css = readFileSync(here('./src/runway.css'), 'utf8');
 const js = readFileSync(here('./src/runway.js'), 'utf8');
 const font = readFileSync(here('./src/inter-600.woff2')).toString('base64');
@@ -12,8 +18,8 @@ const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replac
 const money = (n) => '$' + n.toFixed(2);
 const pad = (n) => String(n).padStart(2, '0');
 const productUrl = (id) => `${SHOP}/products/${id}`;
-const m640 = (m) => `${ASSET}model-${m}-640.webp`;
-const m1080 = (m) => `${ASSET}original-look-${m}.webp`;
+const m640 = (m) => `${BASE}model-${m}-640.webp`;
+const m1080 = (m) => `${BASE}original-look-${m}.webp`;
 
 const modelImg = (look) => `<img src="${m640(look.model)}" srcset="${m640(look.model)} 640w, ${m1080(look.model)} 1080w" sizes="(min-width: 1800px) 540px, (min-width: 750px) 420px, 320px" loading="eager" decoding="async" width="1100" height="1956" draggable="false" data-model-image alt="${esc(look.name)}">`;
 
@@ -51,11 +57,11 @@ function itemMarkup(look, it, k) {
   const variants = JSON.stringify(p.variants.map(([v, id]) => ({ id, a: true, o: [v] })));
   return `<li class="rw__item" data-rw-card="${n}" style="--i:${n}" data-title="${esc(p.name)}">`
     + (it.tag ? `<span class="rw__tag"><span class="rw__tag-text">${esc(it.tag)}</span></span>` : '')
-    + `<a class="rw__media" href="${url}" target="_blank" rel="noopener noreferrer" tabindex="-1" aria-hidden="true"><img src="${ASSET}${p.image}" loading="lazy" decoding="async" alt="" width="${p.w}" height="${p.h}"><span class="rw__num">${n}</span></a>`
+    + `<a class="rw__media" href="${url}" target="_blank" rel="noopener noreferrer" tabindex="-1" aria-hidden="true"><img src="${BASE}${p.image}" loading="lazy" decoding="async" alt="" width="${p.w}" height="${p.h}"><span class="rw__num">${n}</span></a>`
     + `<div class="rw__info"><span class="rw__type">${esc(p.vendor)}</span><a class="rw__name" href="${url}" target="_blank" rel="noopener noreferrer">${esc(p.name)}</a><span class="rw__price"><span>${money(p.price)}</span></span></div>`
     + `<button class="rw__add" type="button" data-rw-add aria-expanded="false" aria-controls="${pickerId}" aria-label="Add to bag: ${esc(p.name)}" data-added-label="Added to bag: ${esc(p.name)}">${ICON.plus}${ICON.check}${ICON.spin('rw__add-spin', 18, 1.5)}</button>`
     + `<div class="rw__picker" data-rw-picker id="${pickerId}" hidden>`
-    + `<div class="rw__picker-head"><img src="${ASSET}${p.image}" loading="lazy" decoding="async" alt="" width="${p.sw}" height="${p.sh}"><div class="rw__picker-copy"><span class="rw__picker-title">${esc(p.name)}</span><span class="rw__picker-price">${money(p.price)}</span></div><button class="rw__pick-close" type="button" data-rw-pick-close aria-label="Close">${ICON.close}</button></div>`
+    + `<div class="rw__picker-head"><img src="${BASE}${p.image}" loading="lazy" decoding="async" alt="" width="${p.sw}" height="${p.sh}"><div class="rw__picker-copy"><span class="rw__picker-title">${esc(p.name)}</span><span class="rw__picker-price">${money(p.price)}</span></div><button class="rw__pick-close" type="button" data-rw-pick-close aria-label="Close">${ICON.close}</button></div>`
     + `<fieldset class="rw__opt"><legend class="rw__opt-name">${esc(p.legend)}</legend><div class="rw__values">${pills}</div></fieldset>`
     + `<button class="rw__confirm" type="button" data-rw-confirm><span data-rw-confirm-label data-add="Add to bag">Add to bag</span><span class="rw__sr"> — ${esc(p.name)}</span></button>`
     + `<script type="application/json" data-rw-variants>${variants}</script>`
@@ -94,29 +100,23 @@ const catalog = {
   looks: LOOKS.map((l) => ({ name: l.name, description: l.description, image: m1080(l.model), products: l.items.map((i) => i.id) })),
   items: CATALOG_ORDER.map((id) => {
     const p = PRODUCTS[id];
-    return { id, name: p.name, type: 'From the original lookbook', price: p.price, image: ASSET + p.image, sizes: p.variants.map(([v]) => v), variants: p.variants.map(([v, vid]) => ({ id: vid, a: true, o: [v] })), url: productUrl(id) };
+    return { id, name: p.name, type: 'From the original lookbook', price: p.price, image: BASE + p.image, sizes: p.variants.map(([v]) => v), variants: p.variants.map(([v, vid]) => ({ id: vid, a: true, o: [v] })), url: productUrl(id) };
   })
 };
 
-const nav = BRAND.nav.map((l) => `<a href="${l.href}"${l.external ? ' target="_blank" rel="noopener noreferrer"' : ''}${l.current ? ' aria-current="page"' : ''}>${esc(l.label)}</a>`).join('');
+const homeHref = (h) => (ARTIFACT && h === './' ? '#' : h);
+const nav = BRAND.nav.map((l) => `<a href="${homeHref(l.href)}"${l.external ? ' target="_blank" rel="noopener noreferrer"' : ''}${l.current ? ' aria-current="page"' : ''}>${esc(l.label)}</a>`).join('');
 
-const html = `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#ffffff">
-<title>${esc(BRAND.title)}</title>
+const headInner = `<title>${esc(BRAND.title)}</title>
 <meta name="description" content="${esc(BRAND.description)}">
 <link rel="preload" as="image" href="${m640(LOOKS[0].model)}" fetchpriority="high">
 <style>
 @font-face{font-family:Inter;src:url(data:font/woff2;base64,${font}) format('woff2');font-weight:600;font-style:normal;font-display:swap}
 ${css}
-</style>
-</head>
-<body>
-<header class="site-header shopify-section-group-header-group">
-<a href="./" class="brand" aria-label="${esc(BRAND.homeLabel)}"><span class="brand-word">${esc(BRAND.name)}</span></a>
+</style>`;
+
+const bodyInner = `<header class="site-header shopify-section-group-header-group">
+<a href="${homeHref('./')}" class="brand" aria-label="${esc(BRAND.homeLabel)}"><span class="brand-word">${esc(BRAND.name)}</span></a>
 <nav aria-label="Main navigation">${nav}</nav>
 <button id="open-bag" type="button" aria-label="Open styling bag"><svg width="22" height="24" viewBox="0 0 24 26" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M4 8h16l1 16H3L4 8zM8 8V6a4 4 0 0 1 8 0v2"/></svg><span data-cart-count>0</span></button>
 </header>
@@ -156,17 +156,30 @@ ${LOOKS.map(panelMarkup).join('\n')}
 <p class="bag-note">A local outfit shortlist. No payment or order is collected here. Open a piece on the original demo to continue.</p>
 <div id="bag-items"></div>
 <p id="bag-total"></p>
-<button id="export-bag" type="button">Download outfit shortlist</button>
+<button id="export-bag" type="button">${ARTIFACT ? 'Copy outfit shortlist' : 'Download outfit shortlist'}</button>
 </dialog>
 <div id="bag-status" role="status" aria-live="polite"></div>
 <script>window.RUNWAY_CATALOG = ${JSON.stringify(catalog)};
-window.RUNWAY_BRAND = ${JSON.stringify({ shortlistHeading: BRAND.shortlistHeading, shopHost: new URL(SHOP).hostname })};</script>
+window.RUNWAY_BRAND = ${JSON.stringify({ shortlistHeading: BRAND.shortlistHeading, shopHost: new URL(SHOP).hostname, exportMode: ARTIFACT ? 'copy' : 'download' })};</script>
 <script>
 ${js}
-</script>
+</script>`;
+
+const html = ARTIFACT
+  ? `${headInner}\n${bodyInner}\n`
+  : `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#ffffff">
+${headInner}
+</head>
+<body>
+${bodyInner}
 </body>
 </html>
 `;
 
-writeFileSync(here('./index.html'), html);
-console.log(`index.html written (${(html.length / 1024).toFixed(1)} KB)`);
+writeFileSync(OUT || here('./index.html'), html);
+console.log(`${OUT || 'index.html'} written (${(html.length / 1024).toFixed(1)} KB)`);
