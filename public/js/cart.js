@@ -3,7 +3,6 @@
   'use strict';
   const KEY = 'polo-cart-v1';
   const MAX = 20;
-  const P = window.POLO || { lang: 'ar', t: {} };
   let toastTimer = 0;
 
   function read() {
@@ -40,7 +39,8 @@
       else cart.push({ v: id, q: Math.min(MAX, quantity || 1) });
     }
     write(cart);
-    if (!opts.silent) toast(items.length > 1 ? P.t.lookSaved : P.t.pieceSaved);
+    const t = (window.POLO && window.POLO.t) || {};
+    if (!opts.silent) toast(items.length > 1 ? t.lookSaved : t.pieceSaved);
   }
   function set(v, q) {
     let cart = read();
@@ -56,10 +56,10 @@
   function money(halalas) {
     const n = (halalas || 0) / 100;
     const s = n.toLocaleString('en-US', { minimumFractionDigits: Number.isInteger(n) ? 0 : 2, maximumFractionDigits: 2 });
-    return P.lang === 'ar' ? `${s} ر.س` : `SAR ${s}`;
+    return (window.POLO && window.POLO.lang) === 'en' ? `SAR ${s}` : `${s} ر.س`;
   }
 
-  window.PoloCart = { read, write, add, set, clear, count, toast, money };
+  window.PoloCart = { read, write, add, set, clear, count, toast, money, renderCount: () => renderCount(read()) };
   renderCount(read());
   window.addEventListener('storage', (e) => { if (e.key === KEY) renderCount(read()); });
 })();

@@ -142,7 +142,7 @@
       const out = await res.json().catch(() => ({}));
       if (res.ok && out.url) {
         Cart.clear();
-        location.href = out.url;
+        (window.POLO_NAV || ((u) => { location.href = u; }))(out.url);
         return;
       }
       if (res.status === 409 && out.quote) {

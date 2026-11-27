@@ -74,4 +74,4 @@ ${scripts.map((s) => (s.startsWith('<') ? s : `<script src="${s}"></script>`)).j
 </html>`;
 }
 
-module.exports = { layout, esc, json, money };
+module.exports = { layout, esc, json, money, clientStrings };

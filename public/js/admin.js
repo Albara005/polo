@@ -1,9 +1,9 @@
 /* POLO admin dashboard */
 (() => {
   'use strict';
-  const A = window.ADMIN;
-  const app = document.getElementById('app');
-  const toastEl = document.getElementById('toast');
+  let A = window.ADMIN;
+  let app = document.getElementById('app');
+  let toastEl = document.getElementById('toast');
   const state = { products: [], looks: [], settings: null, placing: 0, draft: null };
   let toastTimer = 0;
 
@@ -64,7 +64,7 @@
   }
 
   /* ---------- shell ---------- */
-  const TABS = [['orders', 'الطلبات'], ['products', 'المنتجات'], ['looks', 'الإطلالات'], ['settings', 'الإعدادات']];
+  const TABS = [['orders', 'الطلبات'], ['products', 'المنتجات'], ['looks', 'الإطلالات'], ['config', 'الإعدادات']];
   function shell(active, inner) {
     app.innerHTML = `<header class="bar"><span class="logo" dir="ltr">POLO</span><nav>${TABS.map(([k, l]) => `<a href="#${k}"${k === active ? ' aria-current="page"' : ''}>${l}</a>`).join('')}</nav>
 <span class="bar__end"><a href="/" target="_blank" rel="noopener">عرض المتجر ↗</a><button type="button" class="link" id="logout">خروج</button></span></header>
@@ -77,13 +77,13 @@
     try {
       if (section === 'products') return id ? productForm(id) : productList();
       if (section === 'looks') return id ? lookForm(id) : lookList();
-      if (section === 'settings') return settingsView();
+      if (section === 'config') return settingsView();
       return id ? orderView(id) : orderList();
     } catch (err) {
       if (err.message !== 'auth') toast('صار خطأ في التحميل. حدّث الصفحة.', true);
     }
   }
-  window.addEventListener('hashchange', route);
+  window.addEventListener('hashchange', () => { if (document.getElementById('app')) route(); });
 
   /* ---------- orders ---------- */
   const statusChip = (s) => `<span class="status status--${s}">${esc(A.statusLabels[s] || s)}</span>`;
@@ -456,7 +456,7 @@ ${looks.length ? `<ul class="looks">${looks.map((l, i) => `<li><a href="#looks/$
   /* ---------- settings ---------- */
   async function settingsView() {
     const s = await api('GET', '/api/admin/settings');
-    shell('settings', `<div class="head"><h1>الإعدادات</h1></div>
+    shell('config', `<div class="head"><h1>الإعدادات</h1></div>
 <form id="sform" class="form narrow" novalidate>
 <fieldset class="box"><legend>الشحن</legend>
 <div class="grid2 tight">
@@ -489,5 +489,13 @@ ${looks.length ? `<ul class="looks">${looks.map((l, i) => `<li><a href="#looks/$
     });
   }
 
-  boot();
+  window.PoloAdmin = {
+    boot() {
+      A = window.ADMIN;
+      app = document.getElementById('app');
+      toastEl = document.getElementById('toast');
+      boot();
+    }
+  };
+  if (!window.POLO_DEMO) boot();
 })();
