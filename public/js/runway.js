@@ -7,172 +7,9 @@
   const reduced = () => reduceMQ.matches;
   const isPhone = () => window.innerWidth <= 749;
   const reflow = (el) => void el.offsetWidth;
-  const moneyFmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
-  const BRAND = window.RUNWAY_BRAND || { shortlistHeading: 'RUNWAY — STYLING SHORTLIST', shopHost: 'nike-makknzjs.myshopify.com' };
 
-  /* ================================================================
-   * Styling bag (local shortlist)
-   * ================================================================ */
-  const Bag = (() => {
-    const KEY = 'runway-styling-bag-v3';
-    let entries = load();
-    let catalogPromise = null;
-    let catalog = null;
-    let toastTimer = 0;
-    const $ = (id) => document.getElementById(id);
-
-    function load() {
-      try {
-        const raw = JSON.parse(localStorage.getItem(KEY) || '[]');
-        if (!Array.isArray(raw)) return [];
-        return raw.filter((e) => e && Number.isSafeInteger(e.id) && Number.isSafeInteger(e.quantity) && e.quantity >= 1 && e.quantity <= 20)
-          .slice(0, 50).map((e) => ({ id: e.id, quantity: e.quantity }));
-      } catch (_) { return []; }
-    }
-    function save() {
-      try { localStorage.setItem(KEY, JSON.stringify(entries)); } catch (_) { /* storage unavailable */ }
-    }
-    function validate(data) {
-      const ok = data && Array.isArray(data.items) && data.items.every((it) =>
-        typeof it.id === 'string' && typeof it.name === 'string' && Number.isFinite(it.price) && it.price >= 0 &&
-        Array.isArray(it.variants) && it.variants.every((v) => Number.isSafeInteger(v.id) && typeof v.a === 'boolean' &&
-          Array.isArray(v.o) && v.o.every((o) => typeof o === 'string')));
-      if (!ok) throw new Error('The product list is unavailable.');
-      const byVariant = new Map();
-      data.items.forEach((item) => item.variants.forEach((v) => byVariant.set(v.id, { item, variant: v })));
-      return { data, byVariant };
-    }
-    function getCatalog() {
-      if (!catalogPromise) {
-        catalogPromise = Promise.resolve().then(() => {
-          const data = window.RUNWAY_CATALOG;
-          if (!data) throw new Error('The product list could not load.');
-          catalog = validate(data);
-          return catalog;
-        });
-        catalogPromise.catch(() => { catalogPromise = null; });
-      }
-      return catalogPromise;
-    }
-    async function add(items) {
-      const cat = await getCatalog();
-      items.forEach(({ id }) => {
-        const hit = cat.byVariant.get(id);
-        if (!hit || !hit.variant.a) throw new Error('Please choose an available size.');
-      });
-      items.forEach(({ id, quantity }) => {
-        const found = entries.find((e) => e.id === id);
-        if (found) found.quantity = Math.min(20, found.quantity + (quantity || 1));
-        else if (entries.length < 50) entries.push({ id, quantity: quantity || 1 });
-      });
-      save();
-      render();
-      toast(items.length > 1 ? 'Look saved to your styling bag' : 'Piece saved to your styling bag');
-    }
-    function remove(id) {
-      entries = entries.filter((e) => e.id !== id);
-      save();
-      render();
-    }
-    function count() { return entries.reduce((s, e) => s + e.quantity, 0); }
-    function toast(text) {
-      const el = $('bag-status');
-      if (!el) return;
-      el.textContent = text;
-      el.classList.add('is-on');
-      clearTimeout(toastTimer);
-      toastTimer = setTimeout(() => el.classList.remove('is-on'), 2500);
-    }
-    function safeUrl(url) {
-      const u = new URL(url);
-      if (u.hostname !== BRAND.shopHost) throw new Error('Unexpected product link.');
-      return u.href;
-    }
-    function render() {
-      document.querySelectorAll('[data-cart-count]').forEach((el) => { el.textContent = String(count()); });
-      const list = $('bag-items');
-      if (!list) return;
-      const total = $('bag-total');
-      const exportBtn = $('export-bag');
-      list.textContent = '';
-      if (!entries.length || !catalog) {
-        if (!entries.length) {
-          const p = document.createElement('p');
-          p.className = 'bag-note';
-          p.textContent = 'Your styling bag is empty. Choose a size beside a piece to save it.';
-          list.append(p);
-          total.textContent = '';
-          exportBtn.disabled = true;
-          return;
-        }
-      }
-      let sum = 0;
-      entries.forEach((e) => {
-        const hit = catalog && catalog.byVariant.get(e.id);
-        if (!hit) return;
-        const { item, variant } = hit;
-        sum += item.price * e.quantity;
-        const row = document.createElement('div');
-        row.className = 'bag-row';
-        const img = document.createElement('img');
-        img.src = item.image; img.alt = item.name; img.width = 60; img.height = 80; img.loading = 'lazy';
-        const info = document.createElement('div');
-        const h = document.createElement('h3'); h.textContent = item.name;
-        const p = document.createElement('p');
-        p.textContent = `Size ${variant.o.join(' / ')} · Quantity ${e.quantity} · ${moneyFmt.format(item.price)}`;
-        const a = document.createElement('a');
-        a.href = safeUrl(item.url); a.target = '_blank'; a.rel = 'noopener noreferrer';
-        a.textContent = 'View original piece ↗';
-        info.append(h, p, a);
-        const rm = document.createElement('button');
-        rm.type = 'button'; rm.textContent = '×'; rm.setAttribute('aria-label', `Remove ${item.name}`);
-        rm.addEventListener('click', () => remove(e.id));
-        row.append(img, info, rm);
-        list.append(row);
-      });
-      total.textContent = `Reference subtotal ${moneyFmt.format(sum)}`;
-      exportBtn.disabled = false;
-    }
-    function exportList() {
-      if (!entries.length || !catalog) return;
-      const lines = entries.map((e) => {
-        const hit = catalog.byVariant.get(e.id);
-        if (!hit) return '';
-        return `${hit.item.name} · Size ${hit.variant.o.join(' / ')} · Quantity ${e.quantity}\n${hit.item.url}`;
-      }).filter(Boolean);
-      const text = [BRAND.shortlistHeading, 'Reference prices; no order or payment has been placed.', '', ...lines].join('\n\n');
-      if (BRAND.exportMode === 'copy') {
-        try {
-          navigator.clipboard.writeText(text).then(() => toast('Shortlist copied'), () => toast('Copying isn’t available here'));
-        } catch (_) { toast('Copying isn’t available here'); }
-        return;
-      }
-      const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
-      const a = document.createElement('a');
-      a.href = url; a.download = 'runway-outfit-shortlist.txt';
-      document.body.append(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    }
-    function initDialog() {
-      const dialog = $('bag-dialog');
-      const open = $('open-bag');
-      if (open && dialog) {
-        open.addEventListener('click', async () => {
-          try { await getCatalog(); } catch (_) { /* render empty */ }
-          try { render(); } catch (_) { /* bad link */ }
-          if (typeof dialog.showModal === 'function') dialog.showModal(); else dialog.setAttribute('open', '');
-        });
-        $('close-bag').addEventListener('click', () => dialog.close());
-        dialog.addEventListener('click', (e) => {
-          const r = dialog.getBoundingClientRect();
-          if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) dialog.close();
-        });
-        $('export-bag').addEventListener('click', exportList);
-      }
-      getCatalog().then(() => render()).catch(() => render());
-    }
-    return { add, render, initDialog };
-  })();
+  /* Cart lives in /js/cart.js (window.PoloCart) */
+  const Bag = { add: (items) => window.PoloCart.add(items) };
 
   /* ================================================================
    * <runway-section>
@@ -243,10 +80,11 @@
       this.N = this.bodies.length;
 
       // State
-      this.index = 0;
-      this.target = 0;
+      const first = clamp(parseInt(ds.start, 10) || 0, 0, this.n - 1);
+      this.index = first;
+      this.target = first;
       const start = reduced() ? 0 : 1.15;
-      this.cur = -start;
+      this.cur = first - start;
       this.vel = 0;
       this.still = false;
       this.visible = false;
@@ -265,7 +103,7 @@
       this.classList.add('rw--js');
       this.decodeImages(this);
       this.bodies.forEach((s) => {
-        const g = (s.a % this.N + this.N) % this.N;
+        const g = this.wrapN(s.a - first);
         s.goal = g; s.g = g + start; s.x = g + start; s.v = 0;
       });
 
@@ -273,7 +111,7 @@
       this.querySelectorAll('[data-rw-card]').forEach((card) => this.initCard(card));
 
       this.measure();
-      this.setIndex(0, true);
+      this.setIndex(first, true);
       this.probeFeet();
       this.bindEvents();
       this.initCursor();
@@ -1186,5 +1024,4 @@
   }
 
   if (!customElements.get('runway-section')) customElements.define('runway-section', RunwaySection);
-  Bag.initDialog();
 })();

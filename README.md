@@ -1,28 +1,62 @@
-# POLO — Try the Look (Runway)
+# POLO Store
 
-A single page, `index.html`, built with plain HTML, CSS and vanilla JavaScript. Open it in a browser or host it anywhere as a static file.
+A standalone store for POLO, with no Shopify. It is a Node.js server with a SQLite database and an admin dashboard. It runs on Railway or on any server that has Node 22.
 
-- **Desktop (750px and wider):** six models stand on a turning 3D ring. It autoplays every 5 s and has a 01–06 progress bar, arrows, a pause button and a custom "Drag / View" cursor.
-- **"View look" popup:** shows the selected model large, with numbered pins for each product.
-- **"In this look" panel:** each product has a size picker. The panel ends with a bundle price and "Add full look to bag".
-- **Phones (749px and narrower):** the models line up diagonally, the products scroll sideways, and sizes open in a bottom sheet.
-- **Styling bag:** a shortlist saved in the browser (`localStorage`). It can be downloaded as a `.txt` file.
+## What's in it
 
-## Editing
+**Storefront (Arabic and English, prices in SAR):**
+- `/`: the runway. Models turn on a 3D ring. Each look shows its pieces, and the shopper can add a single piece or the full look to the bag.
+- `/shop`: all products, with filters by category.
+- `/product/<slug>`: the product page, with images, sizes, stock and quantity.
+- `/cart`: the cart and checkout. The shopper enters name, mobile, city, district and address, then picks cash on delivery or bank transfer.
+- `/order/<code>`: the order confirmation page.
+- `/track`: order tracking by order number and mobile number.
 
-The page is generated. Do not edit `index.html` by hand.
+**Admin dashboard `/admin` (Arabic, password protected):**
+- **Orders:** filter by status, change status, and contact the customer by WhatsApp or phone. Cancelling an order puts its stock back.
+- **Products:** add, edit, hide or delete. Each product has an Arabic and an English name, a price and an optional compare-at price, sizes with stock per size, images, a description and a "New" tag.
+- **Looks:** upload the model photo, choose its pieces, and click on the photo to place each numbered pin. Each look can have a full-look discount.
+- **Settings:** shipping fee, free-shipping threshold, payment methods, bank transfer details and the store's WhatsApp number.
 
-| File | What it holds |
-|---|---|
-| `src/data.mjs` | Brand name, nav links, looks, products, prices, sizes, variant IDs, pin positions |
-| `src/runway.css` | All styles |
-| `src/runway.js` | Carousel physics, autoplay, popup, pickers and bag |
-| `src/inter-600.woff2` | Nav font, embedded into the page at build time |
+**How prices are calculated:** prices are stored in halalas, and the server prices every cart again. When a cart contains every piece of a look, that look's discount applies once. Shipping is free above the threshold set in Settings.
 
-After any change, rebuild with Node 18 or later:
+## Run locally
 
 ```sh
-node build.mjs
+npm install
+ADMIN_PASSWORD='choose-a-strong-password' npm start
+# open http://localhost:3000 and http://localhost:3000/admin
 ```
 
-The model and product images load from `https://reel-ref-try-the-look.vercel.app/assets/`. Product links point to the Shopify store set in `SHOP` in `src/data.mjs`.
+On the first run the store fills itself with the 8 sample products and 6 looks. Data is saved in `./data/`: the database (`polo.db`) and the uploaded images (`uploads/`).
+
+## Deploy on Railway
+
+1. **New Project → Deploy from GitHub repo**, then choose `polo` and the branch you want to deploy.
+2. **Add a Volume.** Without one, every deploy wipes your products, orders and images.
+   - In the service, choose **Attach Volume** and set the mount path to `/data`.
+   - The app finds it through `RAILWAY_VOLUME_MOUNT_PATH`. You can also set `DATA_DIR=/data` yourself.
+3. **Variables:**
+   - `ADMIN_PASSWORD`: the dashboard password. Use a long one.
+   - `SESSION_SECRET` (optional): a long random string. If you leave it out, the app creates one and saves it on the Volume.
+4. **Settings → Networking → Generate Domain**, or connect your own domain.
+5. Open `https://<your-domain>/admin`, sign in, and replace the sample products and looks with your own.
+
+The included `railway.json` sets the start command and a health check at `/healthz`. Keep the service at **one replica**, because SQLite lives on a single Volume.
+
+## Tips for photos
+
+- **Model photos for looks:** full body from head to feet, a transparent background (PNG or WebP), and a 9:16 ratio. The runway places each model's feet on the floor automatically.
+- **Product photos:** a white or transparent background in portrait orientation. White backgrounds blend into the page.
+
+## Project layout
+
+| Path | Contents |
+|---|---|
+| `server/index.js` | Routes, public API, admin API, image uploads |
+| `server/db.js` | SQLite schema, queries and sample data |
+| `server/pricing.js` | Cart pricing: look discounts and shipping |
+| `server/i18n.js` | Arabic and English text, categories, order statuses |
+| `server/views/` | Page templates (runway, shop, product, cart, order, tracking) |
+| `public/` | CSS and browser scripts (runway, cart, checkout, admin) |
+| `seed/images/` | Sample photos copied in on the first run |

@@ -1,0 +1,19 @@
+{
+  "name": "polo-store",
+  "version": "1.0.0",
+  "private": true,
+  "description": "POLO store: runway lookbook, shop, cart, orders and admin dashboard",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server/index.js",
+    "dev": "node --disable-warning=ExperimentalWarning --watch server/index.js"
+  },
+  "engines": {
+    "node": "22.x"
+  },
+  "dependencies": {
+    "express": "5.1.0",
+    "multer": "2.0.2",
+    "sharp": "0.34.3"
+  }
+}
